@@ -1,5 +1,5 @@
 ---
-title: "BAE565 Final Project Draft"
+title: "Application of Machine Learning Models for Chlorophyll a prediction in Jordan Lake"
 author: "Smitom Swapna Borah"
 date: "5/10/2021"
 output: 
@@ -118,7 +118,7 @@ grid.arrange(chl, TP, TN, Temp, fl, ncol = 2)
 ```
 
 ## Model 1: Random forest model for chlorophyll a prediction
-The Random Forest (RF) model was developed using the caret package. The original data set was initially divided into two parts. For clarity, let these data sets be called 'Train data set' and 'Test data set'. The Test data set contained 20% of the original data and it was kept aside to test the overall efficiency of the RF model. The Train data set was used for model development. This initial division of data was done following data splitting method. Each observation was assumed to be an independent observation and hence the time series nature of the data was neglected. This assumption was based on the poorer performance of a RF model when the same was considered. Although not presented in this report, the results of the RF model with time series consideration can be viewed in the following link:
+The Random Forest (RF) model was developed using the caret package [@kuhn2008]. The original data set was initially divided into two parts. For clarity, let these data sets be called 'Train data set' and 'Test data set'. The Test data set contained 20% of the original data and it was kept aside to test the overall efficiency of the RF model. The Train data set was used for model development. This initial division of data was done following data splitting method. Each observation was assumed to be an independent observation and hence the time series nature of the data was neglected. This assumption was based on the poorer performance of a RF model when the same was considered. Although not presented in this report, the results of the RF model with time series consideration can be viewed in the following link: https://github.com/SmitomS/BAE565_finalProject/blob/main/RF_timeslice.md
 
 The balanced division of the original data was checked by plotting the density graphs of the original data along with Train and Test data.  
 
@@ -243,7 +243,7 @@ knitr::kable(RF_r2)
 
 
 ## Model 2: Neural network model for chlorophyll a prediction
-The Neural Network model (NN) was developed using 'neuralnet' method from the caret package which allows multiple hidden layers for regression analysis. The original data for the NN model was also split into two parts (75:25) similar to the RF modeling approach.These data set were directly used for model training and testing. For consistency and clarity, let these data sets be called 'training data set' and 'testing data set'. The K-fold approach was not used as it provided no additional advantage towards hyperparameter (number of nodes and hidden layers) tuning. The hyperparameters were chosen prior to the training process and as there was extensive manual intervention during model training, the simplest data distribution technique was adopted. Additionally, the original data set was normalized to the range of 0-1. The summary of the normalized data set is given below.
+The Neural Network model (NN) was developed using 'neuralnet' method from the caret package which allows multiple hidden layers for regression analysis [@kuhn2008]. The original data for the NN model was also split into two parts (75:25) similar to the RF modeling approach.These data set were directly used for model training and testing. For consistency and clarity, let these data sets be called 'training data set' and 'testing data set'. The K-fold approach was not used as it provided no additional advantage towards hyperparameter (number of nodes and hidden layers) tuning. The hyperparameters were chosen prior to the training process and as there was extensive manual intervention during model training, the simplest data distribution technique was adopted. Additionally, the original data set was normalized to the range of 0-1. The summary of the normalized data set is given below.
 
 
 ```{r nn1, echo=TRUE, message=FALSE, warning=FALSE}
@@ -512,7 +512,8 @@ The RF model was also able to mimic the general trend of chlorophyll a in the st
 
 Thus, the RF model seems better suited for the study area. However, this conclusion is based only on the current situation. If more data are considered, the model performances of both models are likely to improve. This might lead to a situation where the NN model might outperform the RF model. Although this is possible, it is difficult to procure reliable data from the distant past and waiting for next few decades to get more data is unpragmatic. Hence, the performance of these model would improve if they are combined with process-based models to develop process guided machine learning models. This is a new field of research but it has the potential to overcome the limitation of data scarcity [@read2019]. The performance of NN model is also likely to improve if other complexed NN algorithms are employed. This could be another path for future research work in this study.  
 
-
+# Data reproducibility
+In the interest of data reproducibility, all the files and data used during study are uploaded to GitHub: https://github.com/SmitomS/BAE565_finalProject.git
 
 
 # References
