@@ -1,0 +1,521 @@
+---
+title: "BAE565 Final Project Draft"
+author: "Smitom Swapna Borah"
+date: "5/10/2021"
+output: 
+  html_document:
+   code_folding : hide
+   fig_caption : true
+
+bibliography: References.bib  
+
+---
+
+# Abstract
+Eutrophication poses a serious environmental challenge and requires sustainable and effective management strategies for mitigation. To develop such strategies, reliable models can be very helpful. In this study, two machine learning models, a Random Forest model and a Neural Network model, have been applied to predict the concentration of chlorophyll a in a section of Jordan Lake which is known to suffer from eutrophication. The aim of this study is to investigate the effectiveness of machine learning models for predictive analytics in Jordan Lake and identify the better model for future applications. Fours feature variables: total phosphorus, total nitrogen, water temperature and flushing rate were considered for chlorophyll a prediction. The Random Forest model has shown a R^2^ value of 0.86 during the training stage and 0.42 during the testing stage. On the other hand, the Neural Network model has shown a R^2^ value of 0.51 during the training stage and 0.37 during the testing stage. Water temperature was identified as the most important parameter for the Random Forest model whereas, for the Neural Network model, total nitrogen concentration was the most important parameter. Overall, the machine learning models showed promising results for further research and Random Forest model seemed to be more apt for the given study area.
+
+# Introduction
+Eutrophication has led to severe impairment of water quality in the lakes and reservoirs across the world [@moal2019], resulting in the rapid growth of harmful algae in many of these water bodies [@toxins2018]. It has been a serious environmental concern and numerous studies have been carried out to understand the factors affecting this phenomenon. Among the prime factors, nutrients such as nitrogen and phosphorus are commonly reported [@schindler1977; @havens2003]. Unfortunately, over the past century, increased agricultural activities and urbanization have intensified nutrient input to the water bodies [@Hupfer2008]. The past century has also seen a rapid increase in global temperature [@temperature2021] which, in turn, has led to an increase in water temperature. Many studies have also linked this rising water temperature to increasing eutrophication [@liu2011; @toxins2018]. Moreover, if the flushing rate in a water body is small, it allows more retention time for higher productivity to take place [@Michalak2013].
+
+The rapid increase in eutrophication has also necessitated a prompt development of effective mitigation strategies. However, it is difficult to choose a certain effective strategy among multiple mitigation strategies. One way to overcome this challenge is to develop a predictive model and apply that model to study the effects of different mitigation strategies on eutrophication in a given water body. Fortunately, there is a wide range of modeling tools to choose from while developing such a model and among these tools, modeling approaches based on machine learning can be very effective in the field of ecology [@anne2016]. The machine learning models can incorporate non-linear relationships in nature and accelerate research productivity. However, prior to the application of a model for predictive analytics, it is important to ensure that the chosen model has satisfactory performance efficiency.
+
+This study aims to investigate the potential of applying machine learning models for chlorophyll a concnetation,  which is taken as a metric for eutrophication, in a section of Jordan Lake. Two machine learning models, Random Forest (RF) model and Neural Network (NN) model, have been applied for the same and the suitability of one model over the other has been also investigated. Both the models have the same number of feature variables : total phosphorus (TP), total nitrogen (TN), water temperature and flushing rate.
+
+
+# Methods
+## Study area
+This study focuses on the uppermost section of the Jordan Lake, NC, above the Farrington Road which receives water from a number of tributaries including Morgan Creek, New Hope Creek and Northeast Creek (Fig.1). Let it be referred to as top segment. It is shallower than rest of the reservoir and  does not undergo stratification during the summer season. The normal pool mean depth has been reported as 2.59 m with a surface area of 13.97 km^2^ [@guidice2019]
+
+```{r Fig_jordan, echo=TRUE, fig.align='center', fig.height=6, fig.width=3, message=FALSE, warning=FALSE, fig.cap="Fig.1 Jordan Lake: The orange section of the reservoir is considered in this study. (Source: Del Guidice et al., 2019)",out.width = '50%'}
+library(png)
+JoLa_img_path <- "JordanLake.png"
+knitr::include_graphics(JoLa_img_path)
+```
+
+
+
+## Data
+The data for this model has been taken from a variety of sources. The hydrologic data of the tributaries were obtained from @usgs2019  and the water quality data for the lake and tributaries were obtained from the @water2019. Additional data for this study were retrieved from the study carried out by @guidice2019.
+
+The machine learning models developed in this study used 4 feature variables (total phosphorus, total nitrogen, water temperature, flushing rate) to predict the chlorophyll a concentration ($\mu$g/L) in top segment :
+
+Variable| description| units
+:-------|:--------------------------|:-------
+chl_ugL| Chlorophyll a concentration|$\mu$g/L
+TP_ugL| Total phosphorus concentration|$\mu$g/L
+TN_ugL| Total nitrogen concentration|$\mu$g/L
+T_w| Water temperature|$^\circ$ C 
+flSeg|Flushing rate of the segment|month^-1^
+
+There are 261 observations available for each feature variable which had been collected over a period of 36 years (1983-2018). A quick summary of the data is shown below:  
+
+```{r data file, echo=TRUE, message=FALSE, warning=FALSE}
+# Loading the required package
+library(readxl)
+
+# reading the data file
+dat<- read_excel("Lake_data.xlsx")
+
+# Summary of the file
+knitr::kable(summary(dat[3:7]))
+```
+The data set presented here has no missing values. However, it had been processed prior to its inclusion in this study. All missing values in the flSeg variable were replaced with the previous non-missing values and data points with extreme values in chl_ugL, TP_ugL or TN_ugL were discarded.
+
+### Temporal variation of variables
+
+In order to understand the nature of data available at hand, each variable was plotted across the time period (Fig.2). The Chlorophyll a concentration has varied very little over the period of record (POR). The total phosphorus concentration in the top segment has overall decreased over the years whereas the total nitrogen concentration has overall increased during the same period of time. The range of variation in water temperature has remained mostly the same with similar seasonal variation throughout the POR. The flushing rate has shown higher variation in the initial years of POR but the variation has decreased in the last decade.   
+
+```{r data plots, echo=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.cap="Fig.2. Variration of feature variables over the period of record"}
+# Loading the required package
+library(ggplot2)
+library(gridExtra)
+# Chl time series
+chl <-ggplot( data = dat) +
+  geom_point(aes(x = cale_date, y = chl_ugL), color = "orange")+
+  theme_classic()+
+  labs(title = "Chlorophyll a in the top segment",
+       x = "Year",
+       y = expression("Chl a ("~mu~"g/L)"))
+
+# TP time series
+TP <-ggplot( data = dat) +
+  geom_point(aes(x = cale_date, y = TP_ugL), color = "red")+
+  theme_classic()+
+  labs(title = "Total phosphorus in the top segment",
+       x = "Year",
+       y = expression("TP ("~mu~"g/L)"))
+
+# TN time series
+TN<-ggplot( data = dat) +
+  geom_point(aes(x = cale_date, y = TN_ugL), color = "blue")+
+  theme_classic()+
+  labs(title = "Total nitrogen in the top segment",
+       x = "Year",
+       y = expression("TN ("~mu~"g/L)"))
+
+# water temperature time series
+Temp<-ggplot( data = dat) +
+  geom_point(aes(x = cale_date, y = T_w))+
+  theme_classic()+
+  labs(title = "Water temperature in the top segment",
+       x = "Year",
+       y = expression("Water temperature (C)"))+
+  ylim(0,50)
+
+# Tflushing rate time series
+fl<-ggplot( data = dat) +
+  geom_point(aes(x = cale_date, y = flSeg), color = "green")+
+  theme_classic()+
+  labs(title = "Flushing rate in the top segment",
+       x = "Year",
+       y = expression("Flushing rate (1/month)"))
+
+grid.arrange(chl, TP, TN, Temp, fl, ncol = 2)
+
+
+
+
+```
+
+## Model 1: Random forest model for chlorophyll a prediction
+The Random Forest (RF) model was developed using the caret package. The original data set was initially divided into two parts. For clarity, let these data sets be called 'Train data set' and 'Test data set'. The Test data set contained 20% of the original data and it was kept aside to test the overall efficiency of the RF model. The Train data set was used for model development. This initial division of data was done following data splitting method. Each observation was assumed to be an independent observation and hence the time series nature of the data was neglected. This assumption was based on the poorer performance of a RF model when the same was considered. Although not presented in this report, the results of the RF model with time series consideration can be viewed in the following link:
+
+The balanced division of the original data was checked by plotting the density graphs of the original data along with Train and Test data.  
+
+```{r rf 1, echo=TRUE, fig.align="center", message=FALSE, warning=FALSE, , fig.cap="Fig.3.RF model:Data distribution of the original data set into Train and Test data sets"}
+# Loading the necessary packages----
+library(tidyverse)
+library(caret)
+library(randomForest)
+
+
+# loading the data frame----
+
+Jorlak_seg1<- dat 
+
+set.seed(777)
+# Creating an additional reserve of test data 
+training_index_seg1 <- createDataPartition(Jorlak_seg1$chl_ugL,
+                                           p = 0.8,
+                                           list = F)
+Train_1 <- Jorlak_seg1[training_index_seg1,]
+Test_1 <- Jorlak_seg1[-training_index_seg1,]
+
+## Checking balance of training set
+ggplot() +
+  geom_density(data = Jorlak_seg1, aes(x = chl_ugL), fill = "black", alpha = 0.5) +
+  geom_density(data = Train_1, aes(x = chl_ugL), color = "red", size = 2) +
+  geom_density(data = Test_1, aes(x = chl_ugL), color = "blue", size = 2) +
+  theme_classic()+
+  annotate("rect", xmin = 100, xmax = 110, ymin = 0.015, ymax = 0.016)+
+  annotate("rect", xmin = 100, xmax = 110, ymin = 0.0135, ymax = 0.0145, fill = "red")+
+  annotate("rect", xmin = 100, xmax = 110, ymin = 0.012, ymax = 0.013, fill = "blue")+
+  annotate("text", x= 115, y = 0.0155, label = "Original data set", hjust = 0)+
+  annotate("text", x= 115, y = 0.014, label = "Train data set", hjust = 0)+
+  annotate("text", x= 115, y = 0.0123, label = "Test data set", hjust = 0)
+
+  
+```
+
+K-fold cross-validation was used in the Train data set to develop the RF model as this method allows each observation to be a part of the model training data set while at the same time, it is computationally less expensive unlike the Leave-One-Out method. The Train data set was divided in 5 fold and the hyperparameters of the best performing RF model from these folds was used to train the final model.Witihin each fold, the data was again divided into 2 parts; let these parts be called 'training data set' and 'testing data set'. The mtry values along with coefficients of determination (R^2^) for the training data and testing data sets used in each fold is given below. 
+```{r rf2, message=FALSE, warning=FALSE}
+# Step-0: Pre-processing the data
+# No preprocessing required
+
+# Step-1: Data splicing for time series
+set.seed(777)
+kfolds <- createFolds(Train_1$chl_ugL,
+                      k = 5,
+                      returnTrain = TRUE)
+# kfolds
+
+
+# Step-2+3: Training and testing
+## Training the model with training data
+out <- setNames(data.frame(matrix(ncol = 3, nrow = 0)), c("mtry", "R2_training_dataset", "R2_testing_dataset"))
+set.seed(777)
+
+# Loop through the  kfolds
+for (i in 1: length(kfolds)){
+  fold <- kfolds[[i]]
+  training <- Train_1[fold,]
+  testing <- Train_1[-fold,]
+
+  # Train model with training data
+  model <- train(
+    chl_ugL ~ TP_ugL+T_w+TN_ugL+flSeg,
+    data = training,
+    method = "rf",
+    importance = TRUE,
+    tuneLength = 3,
+    trControl = trainControl(method = "oob"
+    )
+  )
+  
+  m <- model$bestTune[[1]]
+  ## calculating the model performance with training data
+  training %>% mutate(pred_chl_ugL = predict(model$finalModel, newdata = training))%>%
+    summarize(r2 = 1-(sum((chl_ugL-pred_chl_ugL)^2))/(sum((chl_ugL-mean(chl_ugL))^2))) -> trained 
+  
+  ## calculating the model performance with testing data
+  testing %>% mutate(pred_chl_ugL = predict(model$finalModel, newdata = testing))%>%
+    summarize(r2 = 1-(sum((chl_ugL-pred_chl_ugL)^2))/(sum((chl_ugL-mean(chl_ugL))^2))) -> tested
+  out[i,] <- c(m,trained,tested)
+  
+}
+
+knitr::kable(out)
+
+# Model summary
+# model
+
+```
+
+As mtry = 2 was showed the best performance in the second fold, this values was taken as the final value for the final model. All the models were trained following the Out-Of-Bag (oob) method. The overall performance of the final RF model along with the coefficient of determination (R^2^) and coefficient of correlation (r^2^) are given below.
+
+
+```{r rf3, echo=TRUE, message=FALSE, warning=FALSE}
+
+# Step-4: Training the final model
+# Creating a model using all the data
+set.seed(777)
+model <- train(
+  chl_ugL ~ TP_ugL+T_w+TN_ugL+flSeg,
+  data = Train_1,
+  method = "rf",
+  importance = TRUE,
+  tuneGrid = expand.grid(mtry = c(2)),
+  trControl = trainControl(method = "oob")
+)
+
+# Model summary with entire data set
+model
+
+# calculating the model performance with training data
+Train_1 <- Train_1 %>% mutate(pred_chl_ugL = predict(model$finalModel, newdata = Train_1))
+
+
+Train_1%>%
+  summarize(R2 = 1-(sum((chl_ugL-pred_chl_ugL)^2))/(sum((chl_ugL-mean(chl_ugL))^2)),
+            r2 = cor(chl_ugL, pred_chl_ugL, method = "pearson")^2) -> RF_r2
+knitr::kable(RF_r2)
+```
+
+
+## Model 2: Neural network model for chlorophyll a prediction
+The Neural Network model (NN) was developed using 'neuralnet' method from the caret package which allows multiple hidden layers for regression analysis. The original data for the NN model was also split into two parts (75:25) similar to the RF modeling approach.These data set were directly used for model training and testing. For consistency and clarity, let these data sets be called 'training data set' and 'testing data set'. The K-fold approach was not used as it provided no additional advantage towards hyperparameter (number of nodes and hidden layers) tuning. The hyperparameters were chosen prior to the training process and as there was extensive manual intervention during model training, the simplest data distribution technique was adopted. Additionally, the original data set was normalized to the range of 0-1. The summary of the normalized data set is given below.
+
+
+```{r nn1, echo=TRUE, message=FALSE, warning=FALSE}
+library(neuralnet)
+library(NeuralNetTools)
+
+# Step-0: Pre-processing the data
+
+Jorlak_seg1_nn <- Jorlak_seg1 %>% select(-c('cale_date','segm'))
+
+Jorlak_seg1_preprocess <- preProcess(Jorlak_seg1_nn, method = c('range'))
+Jorlak_seg1_nn <- predict(Jorlak_seg1_preprocess, newdata = Jorlak_seg1_nn)
+Jorlak_seg1_nn <- Jorlak_seg1_nn %>% mutate(cale_date = dat$cale_date, segm = dat$segm)
+knitr::kable(summary(Jorlak_seg1_nn))
+```
+
+To check that the training and testing data sets are adequately balanced, density plots of these data sets along with the Train data set were prepared (Fig.4.). 
+```{r nn2, echo=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.cap="Fig.4.NN model: Data distribution of original data set into training data set and testing data set"}
+# Step-1: Data splitting----
+## initial data split
+set.seed(777)
+# Training_index_seg1 <- createDataPartition(Jorlak_seg1_nn$chl_ugL,
+#                                            p = 0.8,
+#                                            list = F)
+# Train_1_nn <- Jorlak_seg1_nn[Training_index_seg1,]
+# Test_1_nn <- Jorlak_seg1_nn[-Training_index_seg1,]
+
+## data splitting for training and testing the model during model devlopment
+set.seed(777)
+training_index <- createDataPartition(Jorlak_seg1_nn$chl_ugL,
+                                      p = 0.75,
+                                      list = F)
+training_nn <- Jorlak_seg1_nn[training_index,]
+testing_nn <- Jorlak_seg1_nn[-training_index,]
+
+## Checking balance of training set
+ggplot() +
+  geom_density(data = Jorlak_seg1_nn, aes(x = chl_ugL), fill = "black", alpha = 0.5) +
+  geom_density(data = training_nn, aes(x = chl_ugL), color = "red", size = 2) +
+  geom_density(data = testing_nn, aes(x = chl_ugL), color = "blue", size = 2) +
+  theme_classic()+
+  annotate("rect", xmin = 0.6, xmax = 0.62, ymin = 2.5, ymax = 2.6)+
+  annotate("rect", xmin = 0.6, xmax = 0.62, ymin = 2.35, ymax = 2.45, fill = "red")+
+  annotate("rect", xmin = 0.6, xmax = 0.62, ymin = 2.2, ymax =2.3 , fill = "blue")+
+  annotate("text", x= 0.63, y = 2.55, label = "Original data set", hjust = 0)+
+  annotate("text", x= 0.63, y = 2.4, label = "training data set", hjust = 0)+
+  annotate("text", x= 0.63, y = 2.25, label = "testing data set", hjust = 0)
+
+```
+
+Multiple combinations of hidden layers and nodes were tried on the training data set to determine the best performing combination. each model combination was trained using the Resilient Backpropagation (RPROP) with weight backtracking algorithm. Finally, the combination of 4-12-6-1 yielded the best results (Fig.5.). This combination was used to train the final NN model.   
+```{r nn3, echo=TRUE, message=FALSE, warning=FALSE}
+# Step-2: Training and Testing
+x <- c(12,6)
+set.seed(777)
+nn <- neuralnet(
+  chl_ugL~ TP_ugL+TN_ugL+T_w+flSeg,
+  data = training_nn,
+  hidden = x,
+  linear.output = T
+)
+
+# step-3: Quantify the model performance
+## calculating the model performance with training data
+set.seed(777)
+training_nn<-training_nn %>% mutate(pred_chl_ugL = predict(nn, newdata = training_nn))
+
+training_nn %>% summarize(R2 = 1-(sum((chl_ugL-pred_chl_ugL)^2))/(sum((chl_ugL-mean(chl_ugL))^2)),
+            r2 = cor(chl_ugL, pred_chl_ugL, method = "pearson")^2) -> training_nn_EF
+
+
+## calculating the model performance with testing data
+set.seed(777)
+testing_nn <- testing_nn %>% mutate(pred_chl_ugL = predict(nn, newdata = testing_nn))
+
+testing_nn %>%  summarize(R2 = 1-(sum((chl_ugL-pred_chl_ugL)^2))/(sum((chl_ugL-mean(chl_ugL))^2)),
+            r2 = cor(chl_ugL, pred_chl_ugL, method = "pearson")^2) -> testing_nn_EF
+
+
+
+```
+
+```{r nn4, echo=TRUE, fig.align='center', fig.cap="Fig.5.Neural network model for chlorophyll a prediction", fig.height=6, fig.width=6, message=FALSE, warning=FALSE, out.width="70%"}
+# Step-4: Training entire model----
+set.seed(777)
+nn <- neuralnet(
+  chl_ugL~ TP_ugL+TN_ugL+T_w+flSeg,
+  data = Jorlak_seg1_nn,
+  hidden = x,
+  linear.output = T
+)
+
+## calculating the model performance with training data
+set.seed(2000)
+Jorlak_seg1_nn %>% mutate(pred_chl_ugL = predict(nn, newdata = Jorlak_seg1_nn))%>%
+  summarize(R2 = 1-(sum((chl_ugL-pred_chl_ugL)^2))/(sum((chl_ugL-mean(chl_ugL))^2)),
+            r2 = cor(chl_ugL, pred_chl_ugL, method = "pearson")^2) ->NN_r2
+
+
+## Plot network
+plotnet(nn,pad_x = 0.9)
+
+```
+
+```{r hidden layers, echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+    # Weights
+    input_to_Hidden1<-data.frame(nn$weights[[1]][[1]]) %>%
+      rename(H1 = X1, H2 = X2, H3 = X3, H4 = X4, H5 = X5, H6 = X6,
+             H7 = X7, H8 = X8, H9 = X9, H10=X10, H11=X11, H12=X12)
+    row.names(input_to_Hidden1)<- c("bias 1", "TP_ugL", "TN_ugL", "T_w", "flSeg")
+    Hidden1_to_Hidden2<-data.frame(nn$weights[[1]][[2]]) %>%
+      rename(H1 = X1, H2 = X2, H3 = X3, H4 = X4, H5 = X5, H6 = X6)
+    row.names(Hidden1_to_Hidden2)<-c("bias 2", "H1", "H2", "H3", "H4", "H5", "H6",
+                                     "H7", "H8", "H9", "H10", "H11", "H12")
+    Hidden2_to_output<-data.frame(nn$weights[[1]][[3]]) %>% rename(O1 = `nn.weights..1....3..`)
+    row.names(Hidden2_to_output)<-c("bias 3", "H1", "H2", "H3", "H4", "H5", "H6")  
+    ```
+
+<details>
+  <summary>Weights in the NN model</summary>
+    ```{r, echo=FALSE, eval=TRUE, out.width = "80%"}
+    # Weights
+    input_to_Hidden1<-data.frame(nn$weights[[1]][[1]]) %>%
+      rename(H1 = X1, H2 = X2, H3 = X3, H4 = X4, H5 = X5, H6 = X6,
+             H7 = X7, H8 = X8, H9 = X9, H10=X10, H11=X11, H12=X12)
+    row.names(input_to_Hidden1)<- c("bias 1", "TP_ugL", "TN_ugL", "T_w", "flSeg")
+    Hidden1_to_Hidden2<-data.frame(nn$weights[[1]][[2]]) %>%
+      rename(H1 = X1, H2 = X2, H3 = X3, H4 = X4, H5 = X5, H6 = X6)
+    row.names(Hidden1_to_Hidden2)<-c("bias 2", "H1", "H2", "H3", "H4", "H5", "H6",
+                                     "H7", "H8", "H9", "H10", "H11", "H12")
+    Hidden2_to_output<-data.frame(nn$weights[[1]][[3]]) %>% rename(O1 = `nn.weights..1....3..`)
+    row.names(Hidden2_to_output)<-c("bias 3", "H1", "H2", "H3", "H4", "H5", "H6")  
+    ```
+
+
+Input to Hidden layer 1
+
+`r knitr::kable(input_to_Hidden1)`
+
+Hidden layer 1 to Hidden layer 2
+
+`r knitr::kable(Hidden1_to_Hidden2)`
+
+Hidden layer 2 to Output
+
+`r knitr::kable(Hidden2_to_output)`
+
+</details> 
+
+
+
+
+
+
+
+
+
+# Results
+
+## Performance of the Random Forest model
+
+```{r rf5, echo=TRUE, fig.align='center', message=FALSE, warning=FALSE}
+
+## calculating the model performance with testing data
+Test_1 <- Test_1 %>% mutate(pred_chl_ugL = predict(model$finalModel, newdata = Test_1))
+Test_1 %>% summarize(R2 = 1-(sum((chl_ugL-pred_chl_ugL)^2))/(sum((chl_ugL-mean(chl_ugL))^2)))->final_RF_r2
+
+```
+
+During the model training step, the model was exposed to each observation in the Train data set through 4 out of 5 folds. So, the final RF model was tested again with completely new data set (Test data set) to check its overall performance. The best R^2^ of the RF model with mtry = 2 during training stage was `r sprintf("%0.2f",out[2,3]*100)` %. However, when this model was tested with Test data set, its R^2^ decreased to `r sprintf("%0.2f", final_RF_r2[[1]]*100)` %. The scatter plot of predicted and observed chlorophyll a for the Test data set is shown in Fig.6. 
+
+```{r rf6, echo=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.cap="Fig.6. Predicted vs Observed Chlorophyll a concentration in top segment using RF model ", out.width="50%"}
+# Scatter plot with Test data set
+ggplot(data = Test_1)+
+  geom_point(aes(x = chl_ugL, y = pred_chl_ugL), color = "blue")+
+  theme_classic()+
+  labs(x=expression("Observed Chl a ("~mu~"g/L)"),
+       y=expression("Predicted Chl a ("~mu~"g/L)"))+
+  xlim(0,125)+
+  ylim(0,125)
+
+```
+
+```{r rf7, echo=TRUE, message=FALSE, warning=FALSE}
+# predicting chlorophyll a over the POR
+Jorlak_seg1_rf <- Jorlak_seg1 %>% mutate(pred_chl_ugL = predict(model$finalModel, newdata = Jorlak_seg1))
+Jorlak_seg1_rf %>% summarize(R2 = 1-(sum((chl_ugL-pred_chl_ugL)^2))/(sum((chl_ugL-mean(chl_ugL))^2))) -> overall_rf_r2
+```
+
+The RF model was also used to predict the chlorophyll a concentration in the top segment for entire POR and its trend is compared with the observed chlorophyll a concentration (Fig.7). Overall, the model was able to explain `r sprintf("%0.2f", overall_rf_r2*100)` % of the variaton in the observed chlorophyll a data. It was able to follow the trends in the observed chlorophyll a to a certain extent.
+
+
+```{r rf8, echo=TRUE, fig.align='center', message=FALSE, warning=FALSE, fig.cap="Fig.7. Trend of observed and predicted chlorophyll a over period of record"}
+# Plotting the predicted results along the timescale
+predicted_rf<-ggplot(data = Jorlak_seg1_rf)+
+  geom_line(aes(x = cale_date, y = pred_chl_ugL), size = 1, color = "red" )+
+  theme_classic()+
+  labs(x = "Year",
+       y = expression("Predicted Chl a ("~mu~"g/L)"))+
+  ylim(0,200)
+  
+    
+observed_rf<-ggplot(data = Jorlak_seg1_rf)+
+  geom_line(aes(x = cale_date, y = chl_ugL), size = 1)+
+  theme_classic()+
+    labs(x = "Year",
+       y = expression("Observed Chl a ("~mu~"g/L)"))+
+  theme(axis.title.x = element_blank())+
+  ylim(0,200)
+
+grid.arrange(observed_rf, predicted_rf, ncol = 1)
+
+```
+
+### Variable importance
+The variable importance plots for the RF model were also prepared as shown in Fig.8. The water temperature had the highest increase in %MSE. The nutrients (TP and TN), which ranked next, had similar effect in term of MSE %. Similar trend was observed in terms of increase in node purity as well.
+
+
+```{r rf9, echo=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.cap="Fig.8. Variable importance of Random Forest model"}
+# Step-5: inspect the variable importance
+varImpPlot(model$finalModel, main = "Variable importance")
+knitr::kable(importance(model$finalModel, scale = TRUE))
+```
+## Performance of the Neural Network model
+Unlike the RF model, a completely new data set was not kept aside to test the performance of the NN model. As the model was trained following data splitting method, the testing data set had observations completely new to the model and therefore the model efficiency can be judged based on the its performance with this data. The following table gives a brief summary of the model efficiency (R^2^ and r^2^) over training, testing and original data sets. 
+
+```{r nn5, echo=TRUE, message=FALSE, warning=FALSE}
+nn_EF <- rbind(training_nn_EF, testing_nn_EF, NN_r2)
+row.names(nn_EF)<-c("training data set", "testing data set", "original data set")
+
+
+knitr::kable(nn_EF)
+
+```
+
+Thus, during the testing stage the model was able to explain only `r sprintf("%0.2f", nn_EF[2,1]*100)`% of the observed chlorophyll a. The scatter plot of predicted and observed chlorophyll a for the testing data set is shown in Fig.6. However, it is interesting to note that the NN model did not perform well even with the training data set (R^2^ = `r sprintf("%0.2f", nn_EF[1,1])`) and its performance improved when the entire original data set was used for training the model. 
+
+```{r nn6, echo=TRUE, fig.align='center', fig.cap="Fig.9.Predicted vs Observed Chlorophyll a concentration in top segment using NN model ", message=FALSE, warning=FALSE, out.width="50%"}
+# Scatter plot with Test data set
+ggplot(data = testing_nn)+
+  geom_point(aes(x = chl_ugL, y = pred_chl_ugL), color = "blue")+
+  theme_classic()+
+  labs(x=expression("Normalized Observed Chl a"),
+       y=expression("Normalized Predicted Chl a"))+
+  xlim(0,1)+
+  ylim(0,1)
+```
+The NN model was not further used to predict the trend of chlorophyll a concentration in the top segment for entire POR as the complete original data itself was used to train the data and any assessment of the model based on such a plot would be misleading.
+
+### Variable importance
+The variable importance of the NN model was carried out following Olden's method (Fig.10). For the NN model, the nutrients are the most important variables, between which TN appears to be more important than TP. Flushing rate is the next important variable and water temperature is least important variable.This is contrasting to the RF model which considers water temperature as the most important variable.
+
+
+```{r nn7, echo=TRUE, message=FALSE, warning=FALSE, fig.align='center', fig.cap="Fig. 10. Variable importance based on oldens method"}
+# Step-5: Variable importance
+# Predictor variable importance
+olden(nn) 
+```
+
+
+
+# Discussion
+In this study, two machine learning regression models (RF and NN model) were developed to predict the chlorophyll a concentration in the top segment of Jordan Lake. The model efficiency (R^2^) of the final RF model was 0.86 whereas that of the final NN model was 0.77. However, a more reliable metric of model performance is its efficiency to predict test data (a completely new data set). In this case, the RF model has performed better than the NN model. The RF model had a model efficiency of 0.42 whereas the NN model had a model efficiency of 0.37. Even within the training data set, the RF model has shown better performance. It was able to consistently explain about 84 to 87 % of the variation in the training data set of each k-fold. On the other hand, the NN model was able to explain only 52 % of the variance in the training data set. This is probably due the fact that NN models usually require large amount of data and perhaps, in this case, 197 observations were not enough to train the NN model adequately. In fact, this argument seems to be supported by the considerable increase in R^2^ value (0.52 to 0.77) of the final NN model. The model efficiency increased by about 48 % when 261 observations were used to train the final model. 
+
+The RF model was also able to mimic the general trend of chlorophyll a in the study area. This can be very helpful for reservoir management as future scenario analysis can be carried out to check the possible effect of different management strategies on future trends. However, the RF model failed to capture the entire variation in chlorophyll a trend and therefore may lead to misleading results if specific events are of interest. On the other hand, as the NN model had lesser model efficiency with test data, it is likely that it will not be able to mimic the general trend of chlorophyll a in the study area as well as the RF model. These models appear to be trained inadequately and therefore, in its current state, it is unsuitable for use in the study area.
+
+Thus, the RF model seems better suited for the study area. However, this conclusion is based only on the current situation. If more data are considered, the model performances of both models are likely to improve. This might lead to a situation where the NN model might outperform the RF model. Although this is possible, it is difficult to procure reliable data from the distant past and waiting for next few decades to get more data is unpragmatic. Hence, the performance of these model would improve if they are combined with process-based models to develop process guided machine learning models. This is a new field of research but it has the potential to overcome the limitation of data scarcity [@read2019]. The performance of NN model is also likely to improve if other complexed NN algorithms are employed. This could be another path for future research work in this study.  
+
+
+
+
+# References
+
+
+
